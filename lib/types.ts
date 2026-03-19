@@ -1,4 +1,12 @@
-export type ModelProvider = 'openai' | 'anthropic' | 'openrouter' | 'custom';
+export type ModelProvider = string;
+
+export interface ProviderSettings {
+    provider: ModelProvider;
+    apiKey: string;
+    baseUrl?: string;
+    customName?: string;
+    customLogoText?: string;
+}
 
 export interface ModelConfig {
     id: string;
@@ -10,7 +18,9 @@ export interface ModelConfig {
 }
 
 export interface AppConfig {
+    providerSettings: ProviderSettings[];
     models: ModelConfig[];
+    hiddenProviders?: string[];
     comparison: {
         modelAId: string; // ID of the model config
         modelBId: string;
@@ -19,7 +29,7 @@ export interface AppConfig {
 
 export interface Message {
     id: string;
-    role: 'system' | 'user' | 'assistant' | 'data';
+    role: 'system' | 'user' | 'assistant' | 'data' | 'function' | 'tool';
     content: string;
 }
 
@@ -27,7 +37,7 @@ export interface ChatSession {
     id: string;
     title: string;
     createdAt: number;
-    type: 'comparison' | 'single';
+    type: 'comparison' | 'single' | 'code';
     modelAId: string;
     modelBId?: string;
     messagesA: Message[];

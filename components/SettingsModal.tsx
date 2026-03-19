@@ -1,443 +1,590 @@
-import React, { useState, useEffect } from 'react';
-import { X, Save, Key, Server, Plus, Trash2, Check, Edit2, TestTube, Loader2, AlertCircle, Copy } from 'lucide-react';
-import { AppConfig, ModelConfig, ModelProvider } from '@/lib/types';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  Check,
+  Edit2,
+  Loader2,
+  MoreVertical,
+  Plus,
+  RotateCcw,
+  Save,
+  TestTube,
+  Trash2,
+  X,
+} from 'lucide-react';
+
+import { ModelLogo } from '@/components/ModelLogo';
+import {
+  AppConfig,
+  ModelConfig,
+  ModelProvider,
+  ProviderSettings,
+} from '@/lib/types';
 
 interface SettingsModalProps {
-    isOpen: boolean;
-    onClose: () => void;
-    onSave: (config: AppConfig) => void;
-    initialConfig: AppConfig;
+  initialConfig: AppConfig;
+  isOpen: boolean;
+  isReadOnly?: boolean;
+  onClose: () => void;
+  onRequireSignIn?: () => void;
+  onSave: (config: AppConfig) => void;
 }
 
-const PROVIDERS: { value: ModelProvider; label: string; defaultBaseUrl: string }[] = [
-    { value: 'openrouter', label: 'OpenRouter', defaultBaseUrl: 'https://openrouter.ai/api/v1' },
-    { value: 'openai', label: 'OpenAI', defaultBaseUrl: 'https://api.openai.com/v1' },
-    { value: 'anthropic', label: 'Anthropic', defaultBaseUrl: 'https://api.anthropic.com/v1' },
-    { value: 'custom', label: 'Custom', defaultBaseUrl: '' },
+const PROVIDERS: Array<{
+  defaultBaseUrl: string;
+  label: string;
+  value: ModelProvider;
+}> = [
+  { value: 'openrouter', label: 'OpenRouter', defaultBaseUrl: 'https://openrouter.ai/api/v1' },
+  { value: 'openai', label: 'OpenAI', defaultBaseUrl: 'https://api.openai.com/v1' },
+  { value: 'anthropic', label: 'Anthropic', defaultBaseUrl: 'https://api.anthropic.com' },
+  { value: 'xai', label: 'xAI', defaultBaseUrl: 'https://api.x.ai/v1' },
+  { value: 'minimax', label: 'MiniMax', defaultBaseUrl: 'https://api.minimax.chat/v1' },
+  { value: 'deepseek', label: 'DeepSeek', defaultBaseUrl: 'https://api.deepseek.com/v1' },
+  { value: 'zhipu', label: 'Zhipu (GLM)', defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+  { value: 'groq', label: 'Groq', defaultBaseUrl: 'https://api.groq.com/openai/v1' },
+  { value: 'siliconflow', label: 'SiliconFlow', defaultBaseUrl: 'https://api.siliconflow.cn/v1' },
+  { value: 'together', label: 'Together AI', defaultBaseUrl: 'https://api.together.xyz/v1' },
 ];
 
-export function SettingsModal({ isOpen, onClose, onSave, initialConfig }: SettingsModalProps) {
-    const [config, setConfig] = useState<AppConfig>(initialConfig);
-    // New model form state
-    const [newModel, setNewModel] = useState<Partial<ModelConfig>>({
-        provider: 'openrouter',
-        apiKey: '',
-        modelId: '',
-        baseUrl: 'https://openrouter.ai/api/v1'
-    });
+const defaultProvider = PROVIDERS[0].value;
 
-    // Editing state
-    const [editingModelId, setEditingModelId] = useState<string | null>(null);
+function normalizeProviderName(name: string): string {
+  return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
 
-    // Testing state
-    const [isTesting, setIsTesting] = useState(false);
-    const [testResult, setTestResult] = useState<{ success: boolean; message: string; error?: string } | null>(null);
+function resolveProviderPreviewId(name: string): string {
+  const normalized = normalizeProviderName(name);
+  if (!normalized) return 'custom';
+  const matched = PROVIDERS.find(
+    (provider) =>
+      provider.value === normalized || normalizeProviderName(provider.label) === normalized,
+  );
+  return matched?.value || normalized;
+}
 
-    useEffect(() => {
-        setConfig(initialConfig);
-    }, [initialConfig]);
+function createEmptyModel(provider: ModelProvider = defaultProvider): Partial<ModelConfig> {
+  return { provider, modelId: '', name: '' };
+}
 
-    if (!isOpen) return null;
+function getProviderMeta(provider: ModelProvider, config?: AppConfig) {
+  const builtIn = PROVIDERS.find((item) => item.value === provider);
+  if (builtIn) return builtIn;
+  const custom = config?.providerSettings.find((item) => item.provider === provider);
+  return {
+    value: provider,
+    label: custom?.customName || provider,
+    defaultBaseUrl: custom?.baseUrl || '',
+  };
+}
 
-    const handleAddModel = () => {
-        if (!newModel.modelId || !newModel.apiKey) return;
+function getProviderSettings(config: AppConfig, provider: ModelProvider): ProviderSettings {
+  return (
+    config.providerSettings.find((item) => item.provider === provider) || {
+      provider,
+      apiKey: '',
+      baseUrl: getProviderMeta(provider, config).defaultBaseUrl,
+    }
+  );
+}
 
-        let updatedConfig: AppConfig;
-        if (editingModelId) {
-            // Update existing model
-            updatedConfig = {
-                ...config,
-                models: config.models.map(m =>
-                    m.id === editingModelId
-                        ? {
-                            ...m,
-                            name: newModel.modelId || '',
-                            provider: newModel.provider as ModelProvider,
-                            apiKey: newModel.apiKey!,
-                            modelId: newModel.modelId!,
-                            baseUrl: newModel.baseUrl
-                        }
-                        : m
-                )
-            };
-            setEditingModelId(null);
-        } else {
-            // Add new model
-            const model: ModelConfig = {
-                id: crypto.randomUUID(),
-                name: newModel.modelId || '',
-                provider: newModel.provider as ModelProvider,
-                apiKey: newModel.apiKey,
-                modelId: newModel.modelId,
-                baseUrl: newModel.baseUrl
-            };
+function upsertProviderSettings(settings: ProviderSettings[], nextSetting: ProviderSettings) {
+  const filtered = settings.filter((item) => item.provider !== nextSetting.provider);
+  if (!nextSetting.apiKey && !nextSetting.baseUrl) return filtered;
+  return [...filtered, nextSetting];
+}
 
-            updatedConfig = {
-                ...config,
-                models: [...config.models, model]
-            };
-        }
+export function SettingsModal({
+  initialConfig,
+  isOpen,
+  isReadOnly = false,
+  onClose,
+  onRequireSignIn,
+  onSave,
+}: SettingsModalProps) {
+  const [config, setConfig] = useState<AppConfig>(initialConfig);
+  const [selectedProvider, setSelectedProvider] = useState<ModelProvider>(defaultProvider);
+  const [newModel, setNewModel] = useState<Partial<ModelConfig>>(createEmptyModel());
+  const [editingModelId, setEditingModelId] = useState<string | null>(null);
+  const [isAddingCustomProvider, setIsAddingCustomProvider] = useState(false);
+  const [editingCustomProviderId, setEditingCustomProviderId] = useState<string | null>(null);
+  const [providerToDelete, setProviderToDelete] = useState<string | null>(null);
+  const [openMenuProviderId, setOpenMenuProviderId] = useState<string | null>(null);
+  const [newCustomProvider, setNewCustomProvider] = useState({ name: '', baseUrl: '' });
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{ message: string; success: boolean } | null>(null);
 
-        setConfig(updatedConfig);
-        // Auto-save when adding/editing models
-        onSave(updatedConfig);
+  useEffect(() => {
+    setConfig(initialConfig);
+  }, [initialConfig]);
 
-        const defaultProvider = 'openrouter' as ModelProvider;
-        const defaultUrl = PROVIDERS.find(p => p.value === defaultProvider)?.defaultBaseUrl || '';
-        setNewModel({
-            provider: defaultProvider,
-            apiKey: '',
-            modelId: '',
-            baseUrl: defaultUrl
-        });
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedProvider(defaultProvider);
+      setNewModel(createEmptyModel());
+      setEditingModelId(null);
+      setIsAddingCustomProvider(false);
+      setEditingCustomProviderId(null);
+      setProviderToDelete(null);
+      setOpenMenuProviderId(null);
+      setNewCustomProvider({ name: '', baseUrl: '' });
+      setTestResult(null);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!openMenuProviderId) return;
+    const handleOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.provider-menu-container')) setOpenMenuProviderId(null);
+    };
+    document.addEventListener('mousedown', handleOutside);
+    return () => document.removeEventListener('mousedown', handleOutside);
+  }, [openMenuProviderId]);
+
+  const allProviders = useMemo(() => {
+    const staticProviders = PROVIDERS.filter(
+      (provider) => !(config.hiddenProviders || []).includes(provider.value),
+    ).map((provider) => ({ ...provider, isCustom: false }));
+
+    const customProviders = config.providerSettings
+      .filter((setting) => !PROVIDERS.some((provider) => provider.value === setting.provider))
+      .map((setting) => ({
+        value: setting.provider,
+        label: setting.customName || setting.provider,
+        defaultBaseUrl: setting.baseUrl || '',
+        isCustom: true,
+      }));
+
+    return [...staticProviders, ...customProviders];
+  }, [config.hiddenProviders, config.providerSettings]);
+
+  const selectedProviderMeta =
+    allProviders.find((provider) => provider.value === selectedProvider) || {
+      ...getProviderMeta(selectedProvider, config),
+      isCustom: false,
     };
 
-    const handleEditModel = (model: ModelConfig) => {
-        setEditingModelId(model.id);
-        setNewModel({
-            provider: model.provider,
-            apiKey: model.apiKey,
-            modelId: model.modelId,
-            baseUrl: model.baseUrl || PROVIDERS.find(p => p.value === model.provider)?.defaultBaseUrl || ''
-        });
-        // Scroll to form
-        setTimeout(() => {
-            const formElement = document.querySelector('.bg-slate-50');
-            formElement?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-    };
+  const activeProviderSettings = getProviderSettings(config, selectedProvider);
+  const modelProviderSettings = getProviderSettings(
+    config,
+    (newModel.provider as ModelProvider) || selectedProvider,
+  );
+  const modelsForSelectedProvider = config.models.filter((model) => model.provider === selectedProvider);
+  const hasUnsavedChanges = JSON.stringify(config) !== JSON.stringify(initialConfig);
 
-    const handleCancelEdit = () => {
-        setEditingModelId(null);
-        const defaultProvider = 'openrouter' as ModelProvider;
-        const defaultUrl = PROVIDERS.find(p => p.value === defaultProvider)?.defaultBaseUrl || '';
-        setNewModel({
-            provider: defaultProvider,
-            apiKey: '',
-            modelId: '',
-            baseUrl: defaultUrl
-        });
-        setTestResult(null);
-    };
+  if (!isOpen) return null;
 
-    const handleTestModel = async () => {
-        if (!newModel.modelId || !newModel.apiKey) {
-            setTestResult({
-                success: false,
-                message: 'Please fill in all required fields',
-            });
-            return;
-        }
+  const requireEditAccess = () => {
+    if (!isReadOnly) return true;
+    onRequireSignIn?.();
+    return false;
+  };
 
-        setIsTesting(true);
-        setTestResult(null);
+  const selectProvider = (provider: ModelProvider) => {
+    setSelectedProvider(provider);
+    setNewModel((current) => ({ ...current, provider }));
+    setIsAddingCustomProvider(false);
+    setProviderToDelete(null);
+    setOpenMenuProviderId(null);
+    setTestResult(null);
+  };
 
-        try {
-            const testConfig: ModelConfig = {
-                id: editingModelId || crypto.randomUUID(),
-                name: newModel.modelId || '',
-                provider: newModel.provider as ModelProvider,
-                apiKey: newModel.apiKey,
-                modelId: newModel.modelId,
-                baseUrl: newModel.baseUrl
-            };
-
-            const response = await fetch('/api/test-model', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ modelConfig: testConfig }),
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                setTestResult({
-                    success: true,
-                    message: data.message || 'Test successful! API key and Model ID are valid.',
-                });
-            } else {
-                // Show detailed error information
-                let errorDetails = data.error || 'Test failed';
-                if (data.originalError && data.originalError !== data.error) {
-                    errorDetails += `\nOriginal error: ${data.originalError}`;
-                }
-                if (data.modelId && data.provider === 'openrouter') {
-                    errorDetails += `\nModel ID: ${data.modelId}`;
-                }
-                
-                setTestResult({
-                    success: false,
-                    message: errorDetails,
-                    error: data.details?.message || data.details?.error?.message || data.originalError,
-                });
+  const updateProviderSettings = (provider: ModelProvider, updates: Partial<ProviderSettings>) => {
+    setConfig((current) => ({
+      ...current,
+      providerSettings: upsertProviderSettings(current.providerSettings, {
+        ...getProviderSettings(current, provider),
+        ...updates,
+        provider,
+      }),
+      models: current.models.map((model) =>
+        model.provider === provider
+          ? {
+              ...model,
+              apiKey: updates.apiKey ?? getProviderSettings(current, provider).apiKey,
+              baseUrl: updates.baseUrl ?? getProviderSettings(current, provider).baseUrl,
             }
-        } catch (error) {
-            setTestResult({
-                success: false,
-                message: 'An error occurred during testing',
-                error: error instanceof Error ? error.message : 'Unknown error',
-            });
-        } finally {
-            setIsTesting(false);
-        }
+          : model,
+      ),
+    }));
+  };
+
+  const resetModelForm = () => {
+    setEditingModelId(null);
+    setNewModel(createEmptyModel(selectedProvider));
+    setTestResult(null);
+  };
+
+  const handleAddCustomProvider = () => {
+    if (!requireEditAccess() || !newCustomProvider.name.trim()) return;
+    const providerId = editingCustomProviderId || normalizeProviderName(newCustomProvider.name);
+    setConfig((current) => ({
+      ...current,
+      providerSettings: upsertProviderSettings(current.providerSettings, {
+        ...getProviderSettings(current, providerId),
+        provider: providerId,
+        customName: newCustomProvider.name.trim(),
+        baseUrl: newCustomProvider.baseUrl.trim(),
+      }),
+    }));
+    setSelectedProvider(providerId);
+    setIsAddingCustomProvider(false);
+    setEditingCustomProviderId(null);
+    setNewCustomProvider({ name: '', baseUrl: '' });
+  };
+
+  const handleEditCustomProvider = (provider: { value: string; label: string; defaultBaseUrl: string }) => {
+    if (!requireEditAccess()) return;
+    setEditingCustomProviderId(provider.value);
+    setNewCustomProvider({ name: provider.label, baseUrl: provider.defaultBaseUrl });
+    setIsAddingCustomProvider(true);
+  };
+
+  const handleRemoveProvider = (providerId: string) => {
+    if (!requireEditAccess()) return;
+    const isBuiltIn = PROVIDERS.some((provider) => provider.value === providerId);
+    setConfig((current) => ({
+      ...current,
+      providerSettings: current.providerSettings.filter((item) => item.provider !== providerId),
+      models: current.models.filter((item) => item.provider !== providerId),
+      hiddenProviders: isBuiltIn
+        ? Array.from(new Set([...(current.hiddenProviders || []), providerId]))
+        : current.hiddenProviders,
+      comparison: {
+        modelAId: current.comparison.modelAId,
+        modelBId: current.comparison.modelBId,
+      },
+    }));
+    setProviderToDelete(null);
+    setOpenMenuProviderId(null);
+  };
+
+  const handleRestoreProviders = () => {
+    if (!requireEditAccess()) return;
+    setConfig((current) => ({ ...current, hiddenProviders: [] }));
+  };
+
+  const handleAddOrUpdateModel = () => {
+    if (!requireEditAccess()) return;
+    const provider = (newModel.provider as ModelProvider) || selectedProvider;
+    const providerSettings = getProviderSettings(config, provider);
+    if (!newModel.modelId || !providerSettings.apiKey) return;
+
+    const nextModel: ModelConfig = {
+      id: editingModelId || crypto.randomUUID(),
+      name: newModel.name || newModel.modelId,
+      provider,
+      apiKey: providerSettings.apiKey,
+      modelId: newModel.modelId,
+      baseUrl: providerSettings.baseUrl,
     };
 
-    const removeModel = (id: string) => {
-        if (editingModelId === id) {
-            handleCancelEdit();
-        }
-        const updatedConfig: AppConfig = {
-            ...config,
-            models: config.models.filter(m => m.id !== id),
-            // Clear comparison if removed model was selected
-            comparison: {
-                modelAId: config.comparison.modelAId === id ? '' : config.comparison.modelAId,
-                modelBId: config.comparison.modelBId === id ? '' : config.comparison.modelBId,
-            }
-        };
-        setConfig(updatedConfig);
-        // Auto-save when removing models
-        onSave(updatedConfig);
-    };
+    setConfig((current) => ({
+      ...current,
+      models: editingModelId
+        ? current.models.map((model) => (model.id === editingModelId ? nextModel : model))
+        : [...current.models, nextModel],
+    }));
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[85vh]">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-                    <h2 className="text-lg font-bold text-slate-800">Configuration</h2>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
+    resetModelForm();
+  };
 
-                <div className="flex border-b border-slate-100 shrink-0">
-                    <button className="flex-1 py-3 text-sm font-medium text-blue-600 border-b-2 border-blue-600">
-                        Manage Models
-                    </button>
-                </div>
+  const handleEditModel = (model: ModelConfig) => {
+    if (!requireEditAccess()) return;
+    setEditingModelId(model.id);
+    setSelectedProvider(model.provider);
+    setNewModel({ provider: model.provider, modelId: model.modelId, name: model.name });
+  };
 
-                <div className="p-6 overflow-y-auto flex-1">
-                    <div className="space-y-8">
-                            {/* Add/Edit Model Form */}
-                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <h3 className="font-semibold text-slate-800 flex items-center gap-2">
-                                        {editingModelId ? (
-                                            <>
-                                                <Edit2 className="h-4 w-4" /> Edit Model
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Plus className="h-4 w-4" /> Add New Model
-                                            </>
-                                        )}
-                                    </h3>
-                                    {editingModelId && (
-                                        <button
-                                            onClick={handleCancelEdit}
-                                            className="text-xs text-slate-500 hover:text-slate-700 transition-colors"
-                                        >
-                                            Cancel Edit
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-500 mb-1 block">Provider</label>
-                                        <select
-                                            value={newModel.provider}
-                                            onChange={e => {
-                                                const selectedProvider = e.target.value as ModelProvider;
-                                                const defaultUrl = PROVIDERS.find(p => p.value === selectedProvider)?.defaultBaseUrl || '';
-                                                setNewModel({ ...newModel, provider: selectedProvider, baseUrl: defaultUrl });
-                                            }}
-                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                        >
-                                            {PROVIDERS.map(p => (
-                                                <option key={p.value} value={p.value}>{p.label}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-500 mb-1 block">Model ID (API)</label>
-                                        <input
-                                            type="text"
-                                            value={newModel.modelId}
-                                            onChange={e => {
-                                                const newModelId = e.target.value;
-                                                setNewModel({ ...newModel, modelId: newModelId });
-                                            }}
-                                            placeholder={
-                                                newModel.provider === 'openrouter' 
-                                                    ? 'e.g. openai/gpt-4o or anthropic/claude-3-opus'
-                                                    : newModel.provider === 'openai'
-                                                    ? 'e.g. gpt-4-turbo-preview'
-                                                    : newModel.provider === 'anthropic'
-                                                    ? 'e.g. claude-3-opus-20240229'
-                                                    : 'e.g. model-id'
-                                            }
-                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-xs font-medium text-slate-500 mb-1 block">API Key</label>
-                                        <input
-                                            type="text"
-                                            value={newModel.apiKey}
-                                            onChange={e => setNewModel({ ...newModel, apiKey: e.target.value })}
-                                            placeholder="sk-..."
-                                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none font-mono"
-                                        />
-                                    </div>
-                                    {newModel.provider === 'custom' && (
-                                        <div className="col-span-2">
-                                            <label className="text-xs font-medium text-slate-500 mb-1 block">Base URL</label>
-                                            <input
-                                                type="text"
-                                                value={newModel.baseUrl}
-                                                onChange={e => setNewModel({ ...newModel, baseUrl: e.target.value })}
-                                                placeholder="https://your-custom-endpoint/v1"
-                                                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
-                                            />
-                                        </div>
-                                    )}
-                                </div>
-                                {/* Test Result Display */}
-                                {testResult && (
-                                    <div className={`p-3 rounded-lg border flex items-start gap-2 ${
-                                        testResult.success
-                                            ? 'bg-green-50 border-green-200'
-                                            : 'bg-red-50 border-red-200'
-                                    }`}>
-                                        {testResult.success ? (
-                                            <Check className="h-5 w-5 text-green-600 flex-shrink-0 mt-0.5" />
-                                        ) : (
-                                            <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                                        )}
-                                        <div className="flex-1 min-w-0">
-                                            <p className={`text-sm font-medium ${
-                                                testResult.success ? 'text-green-800' : 'text-red-800'
-                                            }`}>
-                                                {testResult.message}
-                                            </p>
-                                            {testResult.error && (
-                                                <p className="text-xs text-red-600 mt-1 font-mono">
-                                                    {testResult.error}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <button
-                                            onClick={() => setTestResult(null)}
-                                            className="text-slate-400 hover:text-slate-600 transition-colors"
-                                        >
-                                            <X className="h-4 w-4" />
-                                        </button>
-                                    </div>
-                                )}
+  const handleRemoveModel = (id: string) => {
+    if (!requireEditAccess()) return;
+    setConfig((current) => ({
+      ...current,
+      models: current.models.filter((model) => model.id !== id),
+      comparison: {
+        modelAId: current.comparison.modelAId === id ? '' : current.comparison.modelAId,
+        modelBId: current.comparison.modelBId === id ? '' : current.comparison.modelBId,
+      },
+    }));
+  };
 
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={handleTestModel}
-                                        disabled={!newModel.modelId || !newModel.apiKey || isTesting}
-                                        className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        {isTesting ? (
-                                            <>
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                Testing...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <TestTube className="h-4 w-4" />
-                                                Test Connection
-                                            </>
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={handleAddModel}
-                                        disabled={!newModel.modelId || !newModel.apiKey}
-                                        className="flex-1 py-2 bg-slate-900 text-white rounded-lg text-sm font-medium hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                                    >
-                                        {editingModelId ? 'Update Model' : 'Add Model'}
-                                    </button>
-                                </div>
-                            </div>
+  const handleTestModel = async () => {
+    if (!requireEditAccess()) return;
+    const provider = (newModel.provider as ModelProvider) || selectedProvider;
+    const providerSettings = getProviderSettings(config, provider);
+    if (!newModel.modelId || !providerSettings.apiKey) {
+      setTestResult({ success: false, message: 'Please fill in API Key and Model ID first.' });
+      return;
+    }
 
-                            {/* Existing Models List */}
-                            <div className="space-y-3">
-                                <h3 className="font-semibold text-slate-800 text-sm">Configured Models</h3>
-                                {config.models.length === 0 && (
-                                    <p className="text-sm text-slate-400 italic">No models configured yet.</p>
-                                )}
-                                {config.models.map(model => (
-                                    <div key={model.id} className={`flex items-center justify-between p-3 bg-white border rounded-lg shadow-sm transition-all ${
-                                        editingModelId === model.id 
-                                            ? 'border-blue-500 ring-2 ring-blue-200' 
-                                            : 'border-slate-200'
-                                    }`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className={`p-2 rounded-md ${model.provider === 'openai' ? 'bg-green-100 text-green-600' : model.provider === 'anthropic' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                <Server className="h-4 w-4" />
-                                            </div>
-                                            <div>
-                                                <p className="font-medium text-slate-800 text-sm">{model.modelId}</p>
-                                                <p className="text-xs text-slate-500 font-mono">{model.modelId} • {model.provider}</p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <button
-                                                onClick={() => {
-                                                    setEditingModelId(null);
-                                                    setNewModel({
-                                                        provider: model.provider,
-                                                        apiKey: model.apiKey,
-                                                        modelId: model.modelId,
-                                                        baseUrl: model.baseUrl || PROVIDERS.find(p => p.value === model.provider)?.defaultBaseUrl || ''
-                                                    });
-                                                    setTestResult(null);
-                                                }}
-                                                className="p-2 text-slate-400 hover:text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
-                                                title="复制为新模型"
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleEditModel(model)}
-                                                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
-                                                title="编辑模型"
-                                            >
-                                                <Edit2 className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => removeModel(model.id)}
-                                                className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-                                                title="删除模型"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                </div>
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const response = await fetch('/api/test-model', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelConfig: {
+            name: newModel.name || newModel.modelId,
+            provider,
+            apiKey: providerSettings.apiKey,
+            modelId: newModel.modelId,
+            baseUrl: providerSettings.baseUrl,
+          },
+        }),
+      });
+      const payload = await response.json();
+      setTestResult({
+        success: Boolean(payload.success),
+        message: payload.message || payload.error || 'Test failed',
+      });
+    } catch (error) {
+      setTestResult({
+        success: false,
+        message: error instanceof Error ? error.message : 'Test failed',
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
-                <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
-                    <button
-                        onClick={() => {
-                            // Save comparison settings before closing
-                            onSave(config);
-                            onClose();
-                        }}
-                        className="flex items-center gap-2 px-6 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/20 font-medium"
-                    >
-                        <Save className="h-4 w-4" />
-                        保存并关闭
-                    </button>
-                </div>
-            </div>
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 backdrop-blur-sm">
+      <div className="flex h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-800">Configuration</h2>
+            <p className="mt-1 text-xs text-slate-500">
+              Configure providers first, then manage models under each provider.
+            </p>
+          </div>
+          <button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+            <X className="h-5 w-5" />
+          </button>
         </div>
-    );
+
+        <div className="flex-1 overflow-hidden p-4">
+          <div className="grid h-full min-h-0 gap-6 lg:grid-cols-[220px_minmax(0,1fr)]">
+            <div className="flex min-h-0 flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <div className="flex-1 space-y-2 overflow-y-auto pr-1">
+                {allProviders.map((provider) => {
+                  const isActive = provider.value === selectedProvider;
+                  return (
+                    <div
+                      key={provider.value}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectProvider(provider.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') selectProvider(provider.value);
+                      }}
+                      className={`group flex w-full cursor-pointer items-center justify-between rounded-xl border px-3 py-3 text-left outline-none transition-colors ${
+                        isActive ? 'border-blue-300 bg-white shadow-sm' : 'border-transparent bg-transparent hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <ModelLogo model={{ provider: provider.value }} size="sm" />
+                        <p className="truncate text-sm font-medium text-slate-800">{provider.label}</p>
+                      </div>
+                      <div className="provider-menu-container flex shrink-0 items-center gap-1">
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setOpenMenuProviderId(openMenuProviderId === provider.value ? null : provider.value);
+                            }}
+                            className={`rounded-lg p-1.5 transition-all ${
+                              openMenuProviderId === provider.value
+                                ? 'bg-slate-200 text-slate-700 opacity-100'
+                                : isActive
+                                  ? 'text-slate-400 opacity-100 hover:bg-slate-200 hover:text-slate-600'
+                                  : 'text-slate-400 opacity-0 group-hover:opacity-100 hover:bg-slate-200 hover:text-slate-600'
+                            }`}
+                            aria-label="More actions"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                          {openMenuProviderId === provider.value && (
+                            <div className="absolute right-full top-1/2 z-[100] mr-2 flex -translate-y-1/2 flex-col rounded-lg border border-slate-200 bg-white p-1 shadow-xl">
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleEditCustomProvider(provider);
+                                  setOpenMenuProviderId(null);
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-blue-50 hover:text-blue-600"
+                                title="Edit"
+                                aria-label="Edit"
+                              >
+                                <Edit2 className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setProviderToDelete(provider.value);
+                                  setOpenMenuProviderId(null);
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-600 hover:bg-red-50 hover:text-red-600"
+                                title="Delete"
+                                aria-label="Delete"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAddingCustomProvider(true)}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 py-3 text-sm font-medium text-slate-500 hover:border-blue-300 hover:bg-white hover:text-blue-600"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+                {config.hiddenProviders && config.hiddenProviders.length > 0 && (
+                  <button
+                    onClick={handleRestoreProviders}
+                    className="flex items-center justify-center rounded-xl border border-dashed border-slate-300 px-3 py-3 text-sm font-medium text-slate-500 hover:border-emerald-300 hover:bg-white hover:text-emerald-600"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex min-h-0 flex-col gap-3">
+              {providerToDelete ? (
+                <div className="w-full space-y-4 rounded-xl border-2 border-red-200 bg-red-50 p-5 shadow-sm">
+                  <div className="flex items-center gap-4 text-red-800">
+                    <div className="rounded-full bg-red-100 p-3"><Trash2 className="h-6 w-6 text-red-600" /></div>
+                    <div>
+                      <h3 className="text-base font-bold">Delete Provider</h3>
+                      <p className="mt-1 text-sm text-red-600/80">This will also remove all models under this provider.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button type="button" onClick={() => setProviderToDelete(null)} className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                    <button type="button" onClick={() => handleRemoveProvider(providerToDelete)} className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-red-300 bg-white py-2.5 text-sm font-bold text-red-700 hover:bg-red-100 active:bg-red-200"><Trash2 className="h-4 w-4" />Confirm Delete</button>
+                  </div>
+                </div>
+              ) : isAddingCustomProvider ? (
+                <div className="w-full space-y-4 rounded-xl border-2 border-blue-500 bg-white p-6 shadow-lg">
+                  <div className="flex items-center justify-between border-b pb-3">
+                    <h3 className="text-lg font-bold text-slate-800">{editingCustomProviderId ? 'Edit Provider' : 'Add Provider'}</h3>
+                    <button onClick={() => { setIsAddingCustomProvider(false); setEditingCustomProviderId(null); }} className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><X className="h-4 w-4" /></button>
+                  </div>
+                  <div className="space-y-4 pt-2">
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Provider Name</label>
+                      <div className="flex items-center gap-3">
+                        <ModelLogo model={{ provider: resolveProviderPreviewId(newCustomProvider.name) }} size="sm" />
+                        <input autoFocus type="text" value={newCustomProvider.name} onChange={(event) => setNewCustomProvider((current) => ({ ...current, name: event.target.value }))} placeholder="e.g. OpenAI, Ollama, LocalAI" className="flex-1 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Base URL</label>
+                      <input type="text" value={newCustomProvider.baseUrl} onChange={(event) => setNewCustomProvider((current) => ({ ...current, baseUrl: event.target.value }))} placeholder="http://localhost:11434/v1" className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20" />
+                    </div>
+                    <div className="flex w-full gap-3 pt-2">
+                      <button type="button" onClick={() => { setIsAddingCustomProvider(false); setEditingCustomProviderId(null); }} className="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
+                      <button
+                        type="button"
+                        onClick={handleAddCustomProvider}
+                        disabled={!newCustomProvider.name.trim()}
+                        className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg border border-blue-300 bg-blue-50 py-2.5 text-sm font-bold text-blue-700 shadow-sm hover:bg-blue-100 disabled:cursor-not-allowed disabled:border-slate-300 disabled:bg-slate-100 disabled:text-slate-400"
+                      >
+                        <Check className="h-4 w-4" />
+                        Confirm Save
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <div className="flex items-center gap-3">
+                    <ModelLogo model={{ provider: selectedProvider }} size="sm" />
+                    <h3 className="font-semibold text-slate-800">{selectedProviderMeta.label} Settings</h3>
+                  </div>
+                  <div className="grid gap-3">
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">API Key</label>
+                      <input type="text" value={activeProviderSettings.apiKey} onChange={(event) => updateProviderSettings(selectedProvider, { apiKey: event.target.value })} disabled={isReadOnly} placeholder="sk-..." className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100" />
+                    </div>
+                    <div>
+                      <label className="mb-1 block text-xs font-medium text-slate-500">Base URL</label>
+                      <input type="text" value={activeProviderSettings.baseUrl || ''} onChange={(event) => updateProviderSettings(selectedProvider, { baseUrl: event.target.value })} disabled={isReadOnly} placeholder={selectedProviderMeta.defaultBaseUrl} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100" />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex min-h-[20rem] flex-1 flex-col rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="flex items-center justify-end gap-2">
+                  <span className="rounded-full bg-slate-200 px-2.5 py-1 text-xs font-semibold text-slate-600">{modelsForSelectedProvider.length}</span>
+                  <button type="button" onClick={() => { if (!requireEditAccess()) return; setEditingModelId(null); setNewModel(createEmptyModel(selectedProvider)); setTestResult(null); }} disabled={isReadOnly} className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50"><Plus className="h-3.5 w-3.5" /></button>
+                </div>
+                <div className="mt-3 min-h-0 flex-1 space-y-2.5 overflow-y-auto pr-1">
+                  <div className="rounded-xl border border-blue-200 bg-white p-3 shadow-sm">
+                    <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_160px_auto]">
+                      <input type="text" value={newModel.modelId || ''} onChange={(event) => setNewModel((current) => ({ ...current, modelId: event.target.value }))} placeholder="Model ID" disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100" />
+                      <input type="text" value={newModel.name || ''} onChange={(event) => setNewModel((current) => ({ ...current, name: event.target.value }))} placeholder="Model name" disabled={isReadOnly} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 disabled:bg-slate-100" />
+                      <div className="flex gap-2">
+                        <button onClick={handleTestModel} disabled={isReadOnly || isTesting || !newModel.modelId || !modelProviderSettings.apiKey} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100 disabled:opacity-50">{isTesting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <TestTube className="h-3.5 w-3.5" />}Test</button>
+                        <button onClick={handleAddOrUpdateModel} disabled={isReadOnly || !newModel.modelId || !modelProviderSettings.apiKey} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 disabled:opacity-50"><Check className="h-3.5 w-3.5" />Confirm</button>
+                        <button type="button" onClick={resetModelForm} className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50"><X className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </div>
+                    {testResult && (
+                      <div className={`mt-3 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs ${testResult.success ? 'border-green-200 bg-green-50 text-green-800' : 'border-red-200 bg-red-50 text-red-800'}`}>
+                        {testResult.success ? <Check className="mt-0.5 h-4 w-4 flex-shrink-0" /> : <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />}
+                        <p className="leading-5">{testResult.message}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {modelsForSelectedProvider.length === 0 && <p className="py-2 text-sm italic text-slate-400">No models added for this provider yet.</p>}
+
+                  {modelsForSelectedProvider.map((model) => (
+                    <div key={model.id} className={`flex items-center justify-between rounded-lg border bg-white px-3 py-2.5 shadow-sm transition-all ${editingModelId === model.id ? 'border-blue-500 ring-2 ring-blue-200' : 'border-slate-200'}`}>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <ModelLogo model={model} size="sm" />
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-medium text-slate-800">{model.name}</p>
+                          <p className="text-xs text-slate-500">{model.modelId}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => handleEditModel(model)} disabled={isReadOnly} className="rounded-lg p-2 text-slate-400 hover:bg-blue-50 hover:text-blue-500 disabled:opacity-40"><Edit2 className="h-4 w-4" /></button>
+                        <button onClick={() => handleRemoveModel(model.id)} disabled={isReadOnly} className="rounded-lg p-2 text-slate-400 hover:bg-red-50 hover:text-red-500 disabled:opacity-40"><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 border-t border-slate-100 bg-slate-50 px-6 py-4">
+          {isReadOnly && onRequireSignIn ? (
+            <button onClick={onRequireSignIn} className="flex items-center gap-2 rounded-lg bg-slate-900 px-6 py-2 text-white hover:bg-slate-800">Sign In to Edit</button>
+          ) : (
+            <button onClick={() => { onSave(config); onClose(); }} disabled={!hasUnsavedChanges} className="flex items-center gap-2 rounded-lg bg-slate-900 px-6 py-2 font-medium text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-300">
+              <Save className="h-4 w-4" />
+              Save Changes
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

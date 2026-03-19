@@ -19,11 +19,10 @@ interface ModelColumnProps {
     userMessages?: Message[]; // User messages for comparison view (displayed in center)
 }
 
-export function ModelColumn({ modelName, messages, isLoading, color, isComparison = false, userMessages }: ModelColumnProps) {
+export function ModelColumn({ messages, isLoading, color, isComparison = false, userMessages }: ModelColumnProps) {
     const isBlue = color === 'blue';
     const bgColor = isBlue ? 'bg-slate-50/50' : 'bg-slate-50/50'; // Keep background neutral
     const accentColor = isBlue ? 'text-blue-600' : 'text-purple-600';
-    const bubbleColor = isBlue ? 'bg-blue-50 border-blue-100 text-slate-800' : 'bg-purple-50 border-purple-100 text-slate-800';
     return (
         <div className={`flex flex-col h-full ${bgColor}`}>
             <div className="flex-1 overflow-y-auto px-4 pb-32 scroll-smooth">

@@ -1,30 +1,44 @@
 import { NextRequest } from 'next/server';
-import { getChatSessionById } from '@/lib/db';
+
+import { withAuth, ApiRouteError, json } from '@/lib/api-utils';
+import { deleteChatSession, getChatSessionById } from '@/lib/db';
 
 export const runtime = 'nodejs';
 
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+type RouteContext = {
+  params: Promise<{ id: string }>;
+};
 
-export async function GET(
-    req: NextRequest,
-    ctx: { params: Promise<{ id: string }> }
-) {
-    const sessionAuth = await getServerSession(authOptions);
-    if (!sessionAuth?.user) {
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401 });
+export const GET = withAuth(
+  async (_req: NextRequest, context: RouteContext, auth) => {
+    if (!auth) {
+      return json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
-    const userId = (sessionAuth.user as any).id || sessionAuth.user.email || 'default';
-    const { id } = await ctx.params;
-    const session = await Promise.resolve(getChatSessionById(userId, id));
+
+    const { id } = await context.params;
+    const session = await getChatSessionById(auth.userId, id);
+
     if (!session) {
-        return new Response('Not found', {
-            status: 404,
-        });
+      throw new ApiRouteError('Session not found.', { status: 404 });
     }
 
-    return new Response(JSON.stringify(session), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-    });
-}
+    return json(session);
+  },
+);
+
+export const DELETE = withAuth(
+  async (_req: NextRequest, context: RouteContext, auth) => {
+    if (!auth) {
+      return json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { id } = await context.params;
+    const deleted = await deleteChatSession(auth.userId, id);
+
+    if (!deleted) {
+      throw new ApiRouteError('Session not found.', { status: 404 });
+    }
+
+    return json({ success: true });
+  },
+);

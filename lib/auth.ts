@@ -1,5 +1,14 @@
-import { NextAuthOptions } from "next-auth";
+import { NextAuthOptions, DefaultSession } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+
+// Extend the built-in session types
+declare module "next-auth" {
+  interface Session extends DefaultSession {
+    user?: {
+      id: string;
+    } & DefaultSession["user"];
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -7,18 +16,18 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       httpOptions: {
-        timeout: 10000,
+        timeout: 30000, // 增加超时时间到 30 秒以应对网络波动
       },
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn() {
       return true;
     },
     async session({ session, token }) {
       if (session.user && token.sub) {
         // Revert to using the persistent Google ID (sub) as the primary identifier
-        (session.user as any).id = token.sub;
+        session.user.id = token.sub;
       }
       return session;
     },
@@ -33,5 +42,5 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
   },
   secret: process.env.NEXTAUTH_SECRET,
-  debug: true,
+  debug: process.env.NEXTAUTH_DEBUG === "true",
 };
