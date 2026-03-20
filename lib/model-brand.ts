@@ -39,7 +39,14 @@ const PROVIDER_BRAND_META: Partial<Record<ModelProvider, BrandMeta>> = {
     borderClassName: 'border-orange-200',
   },
   minimax: {
-    label: 'MiniMax',
+    label: 'MiniMax (China)',
+    text: 'MM',
+    bgClassName: 'bg-teal-50',
+    textClassName: 'text-teal-700',
+    borderClassName: 'border-teal-200',
+  },
+  'minimax-intl': {
+    label: 'MiniMax (International)',
     text: 'MM',
     bgClassName: 'bg-teal-50',
     textClassName: 'text-teal-700',
@@ -230,7 +237,9 @@ function getProviderLabel(provider: ModelProvider) {
     case 'groq':
       return 'Groq';
     case 'minimax':
-      return 'MiniMax';
+      return 'MiniMax (China)';
+    case 'minimax-intl':
+      return 'MiniMax (International)';
     case 'openai':
       return 'OpenAI';
     case 'openrouter':

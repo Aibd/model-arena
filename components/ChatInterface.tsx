@@ -465,7 +465,7 @@ export function ChatInterface({
                               className="h-6 w-6 rounded-lg text-[10px]"
                             />
                             <span className="text-[11px] font-semibold text-blue-600 truncate block">
-                              {modelAConfig?.name || 'Model A'}
+                              {modelAConfig?.name || modelAConfig?.modelId || 'Model A'}
                             </span>
                           </div>
                           <div className={markdownClassName}>
@@ -488,7 +488,7 @@ export function ChatInterface({
                               className="h-6 w-6 rounded-lg text-[10px]"
                             />
                             <span className="text-[11px] font-semibold text-blue-600 truncate block">
-                              {modelAConfig?.name || 'Model A'}
+                              {modelAConfig?.name || modelAConfig?.modelId || 'Model A'}
                             </span>
                           </div>
                           <div className="flex space-x-1.5 h-5 items-center">
@@ -512,7 +512,7 @@ export function ChatInterface({
                               className="h-6 w-6 rounded-lg text-[10px]"
                             />
                             <span className="text-[11px] font-semibold text-purple-600 truncate block">
-                              {modelBConfig?.name || 'Model B'}
+                              {modelBConfig?.name || modelBConfig?.modelId || 'Model B'}
                             </span>
                           </div>
                           <div className={markdownClassName}>
@@ -535,7 +535,7 @@ export function ChatInterface({
                               className="h-6 w-6 rounded-lg text-[10px]"
                             />
                             <span className="text-[11px] font-semibold text-purple-600 truncate block">
-                              {modelBConfig?.name || 'Model B'}
+                              {modelBConfig?.name || modelBConfig?.modelId || 'Model B'}
                             </span>
                           </div>
                           <div className="flex space-x-1.5 h-5 items-center">

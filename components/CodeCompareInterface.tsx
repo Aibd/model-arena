@@ -866,7 +866,7 @@ export function CodeCompareInterface({
                     <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-red-800">
-                            {modelAConfig?.modelId || 'Model A'} Error
+                            {modelAConfig?.name || modelAConfig?.modelId || 'Model A'} Error
                         </p>
                         <p className="text-xs text-red-600 mt-1">{errorA}</p>
                     </div>
@@ -884,7 +884,7 @@ export function CodeCompareInterface({
                     <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-red-800">
-                            {modelBConfig?.modelId || 'Model B'} Error
+                            {modelBConfig?.name || modelBConfig?.modelId || 'Model B'} Error
                         </p>
                         <p className="text-xs text-red-600 mt-1">{errorB}</p>
                     </div>

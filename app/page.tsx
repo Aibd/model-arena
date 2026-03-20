@@ -357,7 +357,9 @@ export default function Home() {
       ? 'Code Arena'
       : activeView === 'comparison'
         ? 'Model Arena'
-        : config.models.find((model) => model.id === activeView)?.modelId || 'Chat';
+        : config.models.find((model) => model.id === activeView)?.name ||
+          config.models.find((model) => model.id === activeView)?.modelId ||
+          'Chat';
   const selectedModelA = config.models.find(
     (model) => model.id === config.comparison.modelAId,
   );
@@ -462,7 +464,7 @@ export default function Home() {
                       className="h-6 w-6 rounded-lg text-[10px]"
                     />
                     <span className="text-xs font-semibold text-blue-700 truncate">
-                      {selectedModelA?.modelId || 'Select Model A'}
+                      {selectedModelA?.name || selectedModelA?.modelId || 'Select Model A'}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-blue-500" />
                   </button>
@@ -510,7 +512,7 @@ export default function Home() {
                       className="h-6 w-6 rounded-lg text-[10px]"
                     />
                     <span className="text-xs font-semibold text-purple-700 truncate">
-                      {selectedModelB?.modelId || 'Select Model B'}
+                      {selectedModelB?.name || selectedModelB?.modelId || 'Select Model B'}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-purple-500" />
                   </button>
