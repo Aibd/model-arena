@@ -23,8 +23,10 @@ const providerAssetMap: Record<string, string> = {
   'MiniMax': '/provider-logos/minimax.svg',
   OpenAI: '/provider-logos/openai.svg',
   OpenRouter: '/provider-logos/openrouter.svg',
+  Qwen: '/provider-logos/qwen.svg',
   SiliconFlow: '/provider-logos/siliconflow.svg',
   'Together AI': '/provider-logos/together.svg',
+  Xiaomi: '/provider-logos/xiaomi.svg',
   'Zhipu (GLM)': '/provider-logos/zhipu.svg',
 };
 

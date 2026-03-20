@@ -45,6 +45,8 @@ const PROVIDERS: Array<{
   { value: 'groq', label: 'Groq', defaultBaseUrl: 'https://api.groq.com/openai/v1' },
   { value: 'siliconflow', label: 'SiliconFlow', defaultBaseUrl: 'https://api.siliconflow.cn/v1' },
   { value: 'together', label: 'Together AI', defaultBaseUrl: 'https://api.together.xyz/v1' },
+  { value: 'qwen', label: 'Qwen', defaultBaseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1' },
+  { value: 'xiaomi', label: 'Xiaomi', defaultBaseUrl: 'https://api.xiaomimimo.com/v1' },
 ];
 
 const defaultProvider = PROVIDERS[0].value;

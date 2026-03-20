@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { signIn, useSession } from 'next-auth/react';
-import { Menu, ChevronDown, Code, Eye, Info, Zap } from 'lucide-react';
+import { Menu, ChevronDown, Code, Eye, Info } from 'lucide-react';
 
 import { ChatInterface } from '@/components/ChatInterface';
 import { CodeCompareInterface } from '@/components/CodeCompareInterface';
@@ -438,7 +438,7 @@ export default function Home() {
                 )}
               </div>
             ) : (
-              <h1 className="text-lg font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <h1 className="text-sm font-bold text-slate-400 uppercase tracking-widest">
                 {currentTitle}
               </h1>
             )}
@@ -491,8 +491,8 @@ export default function Home() {
                   )}
                 </div>
 
-                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-orange-400 to-red-500 shadow-sm">
-                  <Zap className="h-4 w-4 text-white" />
+                <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 border border-slate-200">
+                  <span className="text-[10px] font-black text-slate-400 italic">VS</span>
                 </div>
 
                 <div className="relative model-selector">

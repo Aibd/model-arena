@@ -7,7 +7,7 @@ import remarkGfm from 'remark-gfm';
 
 import { ModelLogo } from '@/components/ModelLogo';
 import { getClientErrorMessage } from '@/lib/client-errors';
-import { estimateTextTokens, formatTokenRate } from '@/lib/token-metrics';
+import { estimateTextTokens } from '@/lib/token-metrics';
 import { AppConfig, ChatSession } from '@/lib/types';
 
 import { InputArea } from './InputArea';
@@ -114,8 +114,6 @@ export function ChatInterface({
   const [errorA, setErrorA] = useState<string | null>(null);
   const [errorB, setErrorB] = useState<string | null>(null);
   const [isSessionSyncing, setIsSessionSyncing] = useState(true);
-  const [tokensPerSecondA, setTokensPerSecondA] = useState(0);
-  const [tokensPerSecondB, setTokensPerSecondB] = useState(0);
   const [sessionSeed] = useState(() => ({
     id: crypto.randomUUID(),
     createdAt: Date.now(),
@@ -326,30 +324,17 @@ export function ChatInterface({
       if (streamStatsARef.current.startedAt === 0) {
         streamStatsARef.current.startedAt = Date.now();
         streamStatsARef.current.baselineTokens = totalAssistantTokensA;
-        window.setTimeout(() => setTokensPerSecondA(0), 0);
         return;
       }
-
-      const elapsedSeconds = Math.max(
-        (Date.now() - streamStatsARef.current.startedAt) / 1000,
-        0.001,
-      );
-      const generatedTokens = Math.max(
-        totalAssistantTokensA - streamStatsARef.current.baselineTokens,
-        0,
-      );
-      setTokensPerSecondA(generatedTokens / elapsedSeconds);
       return;
     }
 
     streamStatsARef.current.startedAt = 0;
     streamStatsARef.current.baselineTokens = totalAssistantTokensA;
-    setTokensPerSecondA(0);
   }, [isLoadingA, totalAssistantTokensA]);
 
   useEffect(() => {
     if (activeView !== 'comparison') {
-      window.setTimeout(() => setTokensPerSecondB(0), 0);
       streamStatsBRef.current.startedAt = 0;
       streamStatsBRef.current.baselineTokens = 0;
       return;
@@ -359,25 +344,13 @@ export function ChatInterface({
       if (streamStatsBRef.current.startedAt === 0) {
         streamStatsBRef.current.startedAt = Date.now();
         streamStatsBRef.current.baselineTokens = totalAssistantTokensB;
-        window.setTimeout(() => setTokensPerSecondB(0), 0);
         return;
       }
-
-      const elapsedSeconds = Math.max(
-        (Date.now() - streamStatsBRef.current.startedAt) / 1000,
-        0.001,
-      );
-      const generatedTokens = Math.max(
-        totalAssistantTokensB - streamStatsBRef.current.baselineTokens,
-        0,
-      );
-      setTokensPerSecondB(generatedTokens / elapsedSeconds);
       return;
     }
 
     streamStatsBRef.current.startedAt = 0;
     streamStatsBRef.current.baselineTokens = totalAssistantTokensB;
-    setTokensPerSecondB(0);
   }, [activeView, isLoadingB, totalAssistantTokensB]);
 
   if (!modelAConfig && activeView !== 'comparison') {
@@ -388,13 +361,6 @@ export function ChatInterface({
     );
   }
 
-  const tokenStatsLabels =
-    activeView === 'comparison'
-      ? [
-          `A ${totalAssistantTokensA} tok · ${formatTokenRate(tokensPerSecondA)} tok/s`,
-          `B ${totalAssistantTokensB} tok · ${formatTokenRate(tokensPerSecondB)} tok/s`,
-        ]
-      : [`Out ${totalAssistantTokensA} tok · ${formatTokenRate(tokensPerSecondA)} tok/s`];
 
   const canSend =
     status === 'authenticated' &&

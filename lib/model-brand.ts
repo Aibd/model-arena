@@ -48,9 +48,16 @@ const PROVIDER_BRAND_META: Partial<Record<ModelProvider, BrandMeta>> = {
   openai: {
     label: 'OpenAI',
     text: 'OA',
-    bgClassName: 'bg-white',
-    textClassName: 'text-black',
-    borderClassName: 'border-slate-200',
+    bgClassName: 'bg-emerald-50',
+    textClassName: 'text-emerald-700',
+    borderClassName: 'border-emerald-200',
+  },
+  qwen: {
+    label: 'Qwen',
+    text: 'QW',
+    bgClassName: 'bg-indigo-50',
+    textClassName: 'text-indigo-700',
+    borderClassName: 'border-indigo-200',
   },
   openrouter: {
     label: 'OpenRouter',
@@ -79,6 +86,13 @@ const PROVIDER_BRAND_META: Partial<Record<ModelProvider, BrandMeta>> = {
     bgClassName: 'bg-slate-900',
     textClassName: 'text-white',
     borderClassName: 'border-slate-800',
+  },
+  xiaomi: {
+    label: 'Xiaomi',
+    text: 'MI',
+    bgClassName: 'bg-orange-50',
+    textClassName: 'text-orange-700',
+    borderClassName: 'border-orange-200',
   },
   zhipu: {
     label: 'Zhipu (GLM)',
@@ -221,10 +235,14 @@ function getProviderLabel(provider: ModelProvider) {
       return 'OpenAI';
     case 'openrouter':
       return 'OpenRouter';
+    case 'qwen':
+      return 'Qwen';
     case 'siliconflow':
       return 'SiliconFlow';
     case 'together':
       return 'Together AI';
+    case 'xiaomi':
+      return 'Xiaomi';
     case 'xai':
       return 'xAI';
     case 'zhipu':
