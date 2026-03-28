@@ -20,6 +20,7 @@ const providerAssetMap: Record<string, string> = {
   Anthropic: '/provider-logos/anthropic.svg',
   DeepSeek: '/provider-logos/deepseek.svg',
   Groq: '/provider-logos/groq.svg',
+  'Kimi (Moonshot AI)': '/provider-logos/moonshot.svg',
   'MiniMax (China)': '/provider-logos/minimax.svg',
   'MiniMax (International)': '/provider-logos/minimax.svg',
   OpenAI: '/provider-logos/openai.svg',

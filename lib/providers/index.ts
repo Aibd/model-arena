@@ -17,6 +17,7 @@ const providerAdapters: Record<ModelProvider, ProviderAdapter> = {
   groq: openAIProviderAdapter,
   minimax: openAIProviderAdapter,
   'minimax-intl': openAIProviderAdapter,
+  moonshot: openAIProviderAdapter,
   openai: openAIProviderAdapter,
   openrouter: openRouterProviderAdapter,
   xai: openAIProviderAdapter,

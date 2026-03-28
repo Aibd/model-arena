@@ -41,6 +41,7 @@ const PROVIDERS: Array<{
   { value: 'xai', label: 'xAI', defaultBaseUrl: 'https://api.x.ai/v1' },
   { value: 'minimax', label: 'MiniMax (China)', defaultBaseUrl: 'https://api.minimaxi.com/v1' },
   { value: 'minimax-intl', label: 'MiniMax (International)', defaultBaseUrl: 'https://api.minimax.io/v1' },
+  { value: 'moonshot', label: 'Kimi (Moonshot AI)', defaultBaseUrl: 'https://api.moonshot.cn/v1' },
   { value: 'deepseek', label: 'DeepSeek', defaultBaseUrl: 'https://api.deepseek.com/v1' },
   { value: 'zhipu', label: 'Zhipu (GLM)', defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
   { value: 'groq', label: 'Groq', defaultBaseUrl: 'https://api.groq.com/openai/v1' },

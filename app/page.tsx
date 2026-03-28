@@ -630,7 +630,12 @@ export default function Home() {
             )}
             <button
               type="button"
-              onClick={() => setMode('chat')}
+              onClick={() => {
+                setMode('chat');
+                if (arenaMode !== 'side-by-side') {
+                  handleArenaModeChange('side-by-side');
+                }
+              }}
               className={`px-3 py-1.5 text-xs rounded-full border transition-colors ${
                 mode === 'chat'
                   ? 'bg-slate-900 text-white border-slate-900'
@@ -688,14 +693,14 @@ export default function Home() {
         <main className="flex-1 overflow-hidden relative min-h-0">
           {mode === 'chat' ? (
             <ChatInterface
-              key={`chat-${arenaMode}-${activeView}-${chatResetSeed}`}
+              key={`chat-${arenaMode}-${activeView}-${config.comparison.modelAId}-${config.comparison.modelBId}-${directModelId}-${chatResetSeed}`}
               activeView={activeView}
               config={config}
               loadedSession={mode === 'chat' ? loadedSession : null}
             />
           ) : (
             <CodeCompareInterface
-              key={`code-${chatResetSeed}`}
+              key={`code-${config.comparison.modelAId}-${config.comparison.modelBId}-${chatResetSeed}`}
               config={config}
               loadedSession={mode === 'code' ? loadedSession : null}
               leftMode={leftMode}

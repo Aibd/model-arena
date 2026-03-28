@@ -52,6 +52,13 @@ const PROVIDER_BRAND_META: Partial<Record<ModelProvider, BrandMeta>> = {
     textClassName: 'text-teal-700',
     borderClassName: 'border-teal-200',
   },
+  moonshot: {
+    label: 'Kimi (Moonshot AI)',
+    text: 'KM',
+    bgClassName: 'bg-[#6B46FE]/10',
+    textClassName: 'text-[#6B46FE]',
+    borderClassName: 'border-[#6B46FE]/20',
+  },
   openai: {
     label: 'OpenAI',
     text: 'OA',
@@ -187,13 +194,13 @@ const BRAND_RULES: Array<{
     },
   },
   {
-    label: 'Kimi',
-    match: (value) => /(^|[\W_])(kimi|moonshot)([\W_]|$)/i.test(value),
+    label: 'Kimi (Moonshot AI)',
+    match: (value) => /(^|[\W_])(moonshot|kimi)([\W_]|$)/i.test(value),
     meta: {
-      text: 'Km',
-      bgClassName: 'bg-fuchsia-100',
-      textClassName: 'text-fuchsia-700',
-      borderClassName: 'border-fuchsia-200',
+      text: 'KM',
+      bgClassName: 'bg-[#6B46FE]/10',
+      textClassName: 'text-[#6B46FE]',
+      borderClassName: 'border-[#6B46FE]/20',
     },
   },
   {
@@ -240,6 +247,8 @@ function getProviderLabel(provider: ModelProvider) {
       return 'MiniMax (China)';
     case 'minimax-intl':
       return 'MiniMax (International)';
+    case 'moonshot':
+      return 'Kimi (Moonshot AI)';
     case 'openai':
       return 'OpenAI';
     case 'openrouter':
