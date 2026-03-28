@@ -1,28 +1,23 @@
 services:
-  model-eval:
+  model-arena:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: model-eval
-    restart: always
+    container_name: model-arena
+    restart: unless-stopped
+    env_file:
+      - .env.local
     environment:
-      - NODE_ENV=production
-      - NEXTAUTH_URL=https://your-domain.com # 部署后的域名
-      - NEXTAUTH_SECRET=your-nextauth-secret # 随机字符串，用于加密
-      - GOOGLE_CLIENT_ID=your-google-client-id
-      - GOOGLE_CLIENT_SECRET=your-google-client-secret
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/config"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 10s
-    networks:
-      - proxy-network
-    # If you need to access it directly via port 3000, uncomment the next two lines
-    # ports:
-    #   - "3000:3000"
-
-networks:
-  proxy-network:
-    external: true
+      start_period: 20s
