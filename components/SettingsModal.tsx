@@ -94,7 +94,12 @@ function getProviderSettings(config: AppConfig, provider: ModelProvider): Provid
 
 function upsertProviderSettings(settings: ProviderSettings[], nextSetting: ProviderSettings) {
   const filtered = settings.filter((item) => item.provider !== nextSetting.provider);
-  if (!nextSetting.apiKey && !nextSetting.baseUrl) return filtered;
+  const hasPersistedValue =
+    Boolean(nextSetting.apiKey?.trim()) ||
+    Boolean(nextSetting.baseUrl?.trim()) ||
+    Boolean(nextSetting.customName?.trim()) ||
+    Boolean(nextSetting.customLogoText?.trim());
+  if (!hasPersistedValue) return filtered;
   return [...filtered, nextSetting];
 }
 
@@ -149,12 +154,25 @@ export function SettingsModal({
   }, [openMenuProviderId]);
 
   const allProviders = useMemo(() => {
+    const builtInProviderIds = new Set(PROVIDERS.map((provider) => provider.value));
+    const providerSettingsById = new Map(
+      config.providerSettings.map((setting) => [setting.provider, setting]),
+    );
+
     const staticProviders = PROVIDERS.filter(
       (provider) => !(config.hiddenProviders || []).includes(provider.value),
-    ).map((provider) => ({ ...provider, isCustom: false }));
+    ).map((provider) => {
+      const customSetting = providerSettingsById.get(provider.value);
+      return {
+        ...provider,
+        label: customSetting?.customName || provider.label,
+        defaultBaseUrl: customSetting?.baseUrl || provider.defaultBaseUrl,
+        isCustom: false,
+      };
+    });
 
     const customProviders = config.providerSettings
-      .filter((setting) => !PROVIDERS.some((provider) => provider.value === setting.provider))
+      .filter((setting) => !builtInProviderIds.has(setting.provider))
       .map((setting) => ({
         value: setting.provider,
         label: setting.customName || setting.provider,
