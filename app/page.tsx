@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { signIn, useSession } from 'next-auth/react';
-import { Menu, ChevronDown, Code, Eye, Info } from 'lucide-react';
+import { Menu, ChevronDown, Code, Eye, Info, Search } from 'lucide-react';
 
 import { ChatInterface } from '@/components/ChatInterface';
 import { CodeCompareInterface } from '@/components/CodeCompareInterface';
@@ -70,10 +70,12 @@ export default function Home() {
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState<
     'A' | 'B' | 'Direct' | null
   >(null);
+  const [modelSearchQuery, setModelSearchQuery] = useState('');
   const [loadedSession, setLoadedSession] = useState<ChatSession | null>(null);
   const [chatResetSeed, setChatResetSeed] = useState(0);
   const [leftMode, setLeftMode] = useState<'code' | 'preview'>('code');
   const [rightMode, setRightMode] = useState<'code' | 'preview'>('code');
+  const modelSearchInputRef = useRef<HTMLInputElement | null>(null);
   const [config, setConfig] = useState<AppConfig>({
     providerSettings: [],
     models: [],
@@ -94,6 +96,18 @@ export default function Home() {
       }),
     [config.models],
   );
+  const filteredModels = useMemo(() => {
+    const keyword = modelSearchQuery.trim().toLocaleLowerCase();
+    if (!keyword) {
+      return sortedModels;
+    }
+
+    return sortedModels.filter((model) =>
+      [model.name, model.modelId, model.provider]
+        .filter((value): value is string => Boolean(value))
+        .some((value) => value.toLocaleLowerCase().includes(keyword)),
+    );
+  }, [modelSearchQuery, sortedModels]);
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -146,6 +160,21 @@ export default function Home() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isArenaModeSelectorOpen, isModelSelectorOpen]);
+
+  useEffect(() => {
+    setModelSearchQuery('');
+
+    if (!isModelSelectorOpen) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      modelSearchInputRef.current?.focus();
+      modelSearchInputRef.current?.select();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [isModelSelectorOpen]);
 
   useEffect(() => {
     if (hasHydratedStoredComparison || config.models.length === 0) {
@@ -371,6 +400,62 @@ export default function Home() {
   );
   const isSideBySideMode = mode === 'code' || arenaMode === 'side-by-side';
 
+  const renderModelSelectorDropdown = ({
+    side,
+    selectedId,
+    activeClasses,
+    align = 'left',
+  }: {
+    side: 'A' | 'B' | 'Direct';
+    selectedId: string;
+    activeClasses: string;
+    align?: 'left' | 'right';
+  }) => (
+    <div
+      className={`absolute top-full ${align === 'right' ? 'right-0' : 'left-0'} z-20 mt-2 w-80 rounded-xl border border-slate-200 bg-white py-2 shadow-lg model-selector`}
+    >
+      <div className="px-2 pb-2">
+        <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 shadow-sm">
+          <Search className="h-3.5 w-3.5 text-slate-400" />
+          <input
+            ref={modelSearchInputRef}
+            value={modelSearchQuery}
+            onChange={(event) => setModelSearchQuery(event.target.value)}
+            placeholder="搜索模型名称 / ID / Provider"
+            className="w-full bg-transparent text-xs text-slate-700 outline-none placeholder:text-slate-400"
+          />
+        </div>
+      </div>
+
+      <div className="max-h-64 overflow-y-auto">
+        {filteredModels.length > 0 ? (
+          filteredModels.map((model) => (
+            <button
+              key={model.id}
+              onClick={() => handleModelSelect(side, model.id)}
+              className={`flex w-full items-center gap-2 px-3 py-2.5 text-xs transition-all ${
+                selectedId === model.id
+                  ? activeClasses
+                  : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
+              }`}
+            >
+              <ModelLogo
+                model={model}
+                size="sm"
+                className="h-6 w-6 rounded-lg text-[10px]"
+              />
+              <span className="truncate">{model.name || model.modelId}</span>
+            </button>
+          ))
+        ) : (
+          <div className="px-3 py-6 text-center text-xs text-slate-400">
+            没有匹配的模型
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
       <Sidebar
@@ -470,26 +555,12 @@ export default function Home() {
                   </button>
 
                   {isModelSelectorOpen === 'A' && (
-                    <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20 max-h-64 overflow-y-auto model-selector">
-                      {sortedModels.map((model) => (
-                        <button
-                          key={model.id}
-                          onClick={() => handleModelSelect('A', model.id)}
-                          className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${
-                            config.comparison.modelAId === model.id
-                              ? 'bg-blue-50 text-blue-700 border-l-4 border-blue-500'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                          }`}
-                        >
-                          <ModelLogo
-                            model={model}
-                            size="sm"
-                            className="h-6 w-6 rounded-lg text-[10px]"
-                          />
-                          <span className="truncate">{model.name || model.modelId}</span>
-                        </button>
-                      ))}
-                    </div>
+                    renderModelSelectorDropdown({
+                      side: 'A',
+                      selectedId: config.comparison.modelAId,
+                      activeClasses:
+                        'bg-blue-50 text-blue-700 border-l-4 border-blue-500',
+                    })
                   )}
                 </div>
 
@@ -518,26 +589,13 @@ export default function Home() {
                   </button>
 
                   {isModelSelectorOpen === 'B' && (
-                    <div className="absolute top-full right-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20 max-h-64 overflow-y-auto model-selector">
-                      {sortedModels.map((model) => (
-                        <button
-                          key={model.id}
-                          onClick={() => handleModelSelect('B', model.id)}
-                          className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${
-                            config.comparison.modelBId === model.id
-                              ? 'bg-purple-50 text-purple-700 border-l-4 border-purple-500'
-                              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                          }`}
-                        >
-                          <ModelLogo
-                            model={model}
-                            size="sm"
-                            className="h-6 w-6 rounded-lg text-[10px]"
-                          />
-                          <span className="truncate">{model.name || model.modelId}</span>
-                        </button>
-                      ))}
-                    </div>
+                    renderModelSelectorDropdown({
+                      side: 'B',
+                      selectedId: config.comparison.modelBId,
+                      activeClasses:
+                        'bg-purple-50 text-purple-700 border-l-4 border-purple-500',
+                      align: 'right',
+                    })
                   )}
                 </div>
               </div>
@@ -568,26 +626,12 @@ export default function Home() {
                 </button>
 
                 {isModelSelectorOpen === 'Direct' && (
-                  <div className="absolute top-full left-0 mt-2 w-80 bg-white rounded-xl shadow-lg border border-slate-200 py-2 z-20 max-h-64 overflow-y-auto model-selector">
-                    {sortedModels.map((model) => (
-                      <button
-                        key={model.id}
-                        onClick={() => handleModelSelect('Direct', model.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-2.5 text-xs transition-all ${
-                          directModelId === model.id
-                            ? 'bg-slate-100 text-slate-900 border-l-4 border-slate-500'
-                            : 'text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                        }`}
-                      >
-                        <ModelLogo
-                          model={model}
-                          size="sm"
-                          className="h-6 w-6 rounded-lg text-[10px]"
-                        />
-                        <span className="truncate">{model.name || model.modelId}</span>
-                      </button>
-                    ))}
-                  </div>
+                  renderModelSelectorDropdown({
+                    side: 'Direct',
+                    selectedId: directModelId,
+                    activeClasses:
+                      'bg-slate-100 text-slate-900 border-l-4 border-slate-500',
+                  })
                 )}
               </div>
             </div>

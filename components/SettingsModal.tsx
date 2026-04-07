@@ -205,6 +205,19 @@ export function SettingsModal({
     return false;
   };
 
+  const applyConfigUpdate = (
+    updater: (current: AppConfig) => AppConfig,
+    options?: { persist?: boolean },
+  ) => {
+    setConfig((current) => {
+      const nextConfig = updater(current);
+      if (options?.persist) {
+        onSave(nextConfig);
+      }
+      return nextConfig;
+    });
+  };
+
   const selectProvider = (provider: ModelProvider) => {
     setSelectedProvider(provider);
     setNewModel((current) => ({ ...current, provider }));
@@ -269,18 +282,24 @@ export function SettingsModal({
   const handleRemoveProvider = (providerId: string) => {
     if (!requireEditAccess()) return;
     const isBuiltIn = PROVIDERS.some((provider) => provider.value === providerId);
-    setConfig((current) => ({
-      ...current,
-      providerSettings: current.providerSettings.filter((item) => item.provider !== providerId),
-      models: current.models.filter((item) => item.provider !== providerId),
-      hiddenProviders: isBuiltIn
-        ? Array.from(new Set([...(current.hiddenProviders || []), providerId]))
-        : current.hiddenProviders,
-      comparison: {
-        modelAId: current.comparison.modelAId,
-        modelBId: current.comparison.modelBId,
-      },
-    }));
+    applyConfigUpdate(
+      (current) => ({
+        ...current,
+        providerSettings: current.providerSettings.filter((item) => item.provider !== providerId),
+        models: current.models.filter((item) => item.provider !== providerId),
+        hiddenProviders: isBuiltIn
+          ? Array.from(new Set([...(current.hiddenProviders || []), providerId]))
+          : current.hiddenProviders,
+        comparison: {
+          modelAId: current.comparison.modelAId,
+          modelBId: current.comparison.modelBId,
+        },
+      }),
+      { persist: true },
+    );
+    if (selectedProvider === providerId) {
+      setSelectedProvider(defaultProvider);
+    }
     setProviderToDelete(null);
     setOpenMenuProviderId(null);
   };
@@ -324,14 +343,20 @@ export function SettingsModal({
 
   const handleRemoveModel = (id: string) => {
     if (!requireEditAccess()) return;
-    setConfig((current) => ({
-      ...current,
-      models: current.models.filter((model) => model.id !== id),
-      comparison: {
-        modelAId: current.comparison.modelAId === id ? '' : current.comparison.modelAId,
-        modelBId: current.comparison.modelBId === id ? '' : current.comparison.modelBId,
-      },
-    }));
+    applyConfigUpdate(
+      (current) => ({
+        ...current,
+        models: current.models.filter((model) => model.id !== id),
+        comparison: {
+          modelAId: current.comparison.modelAId === id ? '' : current.comparison.modelAId,
+          modelBId: current.comparison.modelBId === id ? '' : current.comparison.modelBId,
+        },
+      }),
+      { persist: true },
+    );
+    if (editingModelId === id) {
+      resetModelForm();
+    }
   };
 
   const handleTestModel = async () => {
