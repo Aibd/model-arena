@@ -422,6 +422,10 @@ export function ChatInterface({
   const totalAssistantTokensB = estimateTextTokens(
     assistantMessagesB.map((message) => message.content).join('\n'),
   );
+  const lastAssistantMessageIdA =
+    assistantMessagesA[assistantMessagesA.length - 1]?.id;
+  const lastAssistantMessageIdB =
+    assistantMessagesB[assistantMessagesB.length - 1]?.id;
 
   useEffect(() => {
     if (isLoadingA) {
@@ -445,8 +449,13 @@ export function ChatInterface({
         totalAssistantTokensA - streamStatsARef.current.baselineTokens,
         0,
       );
-      setTotalDurationA(elapsedSeconds);
-      setTokensPerSecondA(generatedTokens / elapsedSeconds);
+      const nextTokensPerSecond = generatedTokens / elapsedSeconds;
+      setTotalDurationA((current) =>
+        current === elapsedSeconds ? current : elapsedSeconds,
+      );
+      setTokensPerSecondA((current) =>
+        current === nextTokensPerSecond ? current : nextTokensPerSecond,
+      );
       return;
     }
 
@@ -459,18 +468,32 @@ export function ChatInterface({
         totalAssistantTokensA - streamStatsARef.current.baselineTokens,
         0,
       );
-      
-      const lastAssistantId = assistantMessagesA[assistantMessagesA.length - 1]?.id;
-      if (lastAssistantId) {
-        setMessageStats(prev => ({
-          ...prev,
-          [lastAssistantId]: { duration: elapsedSeconds, tps: generatedTokens / elapsedSeconds }
-        }));
+
+      if (lastAssistantMessageIdA) {
+        const nextTokensPerSecond = generatedTokens / elapsedSeconds;
+        setMessageStats((prev) => {
+          const existing = prev[lastAssistantMessageIdA];
+          if (
+            existing &&
+            existing.duration === elapsedSeconds &&
+            existing.tps === nextTokensPerSecond
+          ) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            [lastAssistantMessageIdA]: {
+              duration: elapsedSeconds,
+              tps: nextTokensPerSecond,
+            },
+          };
+        });
       }
     }
     streamStatsARef.current.startedAt = 0;
     streamStatsARef.current.baselineTokens = totalAssistantTokensA;
-  }, [isLoadingA, totalAssistantTokensA, assistantMessagesA]);
+  }, [isLoadingA, totalAssistantTokensA, lastAssistantMessageIdA]);
 
   useEffect(() => {
     if (activeView !== 'comparison') {
@@ -500,8 +523,13 @@ export function ChatInterface({
         totalAssistantTokensB - streamStatsBRef.current.baselineTokens,
         0,
       );
-      setTotalDurationB(elapsedSeconds);
-      setTokensPerSecondB(generatedTokens / elapsedSeconds);
+      const nextTokensPerSecond = generatedTokens / elapsedSeconds;
+      setTotalDurationB((current) =>
+        current === elapsedSeconds ? current : elapsedSeconds,
+      );
+      setTokensPerSecondB((current) =>
+        current === nextTokensPerSecond ? current : nextTokensPerSecond,
+      );
       return;
     }
 
@@ -514,18 +542,32 @@ export function ChatInterface({
         totalAssistantTokensB - streamStatsBRef.current.baselineTokens,
         0,
       );
-      
-      const lastAssistantId = assistantMessagesB[assistantMessagesB.length - 1]?.id;
-      if (lastAssistantId) {
-        setMessageStats(prev => ({
-          ...prev,
-          [lastAssistantId]: { duration: elapsedSeconds, tps: generatedTokens / elapsedSeconds }
-        }));
+
+      if (lastAssistantMessageIdB) {
+        const nextTokensPerSecond = generatedTokens / elapsedSeconds;
+        setMessageStats((prev) => {
+          const existing = prev[lastAssistantMessageIdB];
+          if (
+            existing &&
+            existing.duration === elapsedSeconds &&
+            existing.tps === nextTokensPerSecond
+          ) {
+            return prev;
+          }
+
+          return {
+            ...prev,
+            [lastAssistantMessageIdB]: {
+              duration: elapsedSeconds,
+              tps: nextTokensPerSecond,
+            },
+          };
+        });
       }
     }
     streamStatsBRef.current.startedAt = 0;
     streamStatsBRef.current.baselineTokens = totalAssistantTokensB;
-  }, [activeView, isLoadingB, totalAssistantTokensB, assistantMessagesB]);
+  }, [activeView, isLoadingB, totalAssistantTokensB, lastAssistantMessageIdB]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {

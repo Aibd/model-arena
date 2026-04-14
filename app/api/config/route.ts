@@ -19,7 +19,7 @@ export const GET = withAuth(
       return json(emptyConfig);
     }
 
-    const config = await readAppConfig(auth.userId, true);
+    const config = await readAppConfig(auth.userId);
     return json(config);
   },
   { optional: true },
